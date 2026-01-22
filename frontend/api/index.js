@@ -8,12 +8,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-mongoose.connect(process.env.MONGODB_URI);
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now }
 });
 
 const skuSchema = new mongoose.Schema({
@@ -59,7 +61,7 @@ app.post('/auth/login', async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Invalid password' });
     
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET);
-    res.json({ token });
+    res.json({ token, message: 'Login successful' });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
