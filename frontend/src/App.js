@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Download, Search, AlertCircle, CheckCircle, Upload, LogOut } from 'lucide-react';
+import { Plus, Trash2, Download, Upload, LogOut } from 'lucide-react';
 import './App.css';
 
 const SKUManager = () => {
