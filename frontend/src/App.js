@@ -2,89 +2,53 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Download, Search, AlertCircle, CheckCircle, Upload, LogOut } from 'lucide-react';
 import './App.css';
 
-const API_URL = '/api';
-
 const SKUManager = () => {
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('isLoggedIn') === 'true');
   const [authForm, setAuthForm] = useState({ email: '', password: '' });
   const [isLogin, setIsLogin] = useState(true);
   
-  const [skuData, setSkuData] = useState([]);
-  const [stones, setStones] = useState(['LL', 'A', 'SP', 'TO', 'AQ', 'EM', 'AME', 'NP', 'AJ', 'QU', 'ID', 'GA', 'PE', 'CT']);
-  const [metals, setMetals] = useState(['BR', 'SL', 'AU', 'CU', 'SS', 'LA']);
-  const [products, setProducts] = useState(['NL', 'R', 'B', 'ER', 'PD', 'BG', 'CL', 'ST', 'PT', 'CG', 'HD', 'FR', 'TM', 'TH']);
-  const [corporateClients, setCorporateClients] = useState(['HBL', 'NUMS', 'DW']);
+  const [skuData, setSkuData] = useState(() => {
+    const saved = localStorage.getItem('skuData');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [stones] = useState(['LL', 'A', 'SP', 'TO', 'AQ', 'EM', 'AME', 'NP', 'AJ', 'QU', 'ID', 'GA', 'PE', 'CT']);
+  const [metals] = useState(['BR', 'SL', 'AU', 'CU', 'SS', 'LA']);
+  const [products] = useState(['NL', 'R', 'B', 'ER', 'PD', 'BG', 'CL', 'ST', 'PT', 'CG', 'HD', 'FR', 'TM', 'TH']);
+  const [corporateClients] = useState(['HBL', 'NUMS', 'DW']);
   
   const [activeTab, setActiveTab] = useState('generator');
-  const [stats, setStats] = useState({ total: 0, duplicates: 0, unique: 0 });
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   
   const [formData, setFormData] = useState({
     stone: '', metal: '', product: '', type: 'product', corporateClient: '', customNumber: ''
   });
 
-  // Fetch data on mount
+  // Save to localStorage whenever skuData changes
   useEffect(() => {
-    if (token) {
-      fetchSKUs();
-      fetchStats();
-    }
-  }, [token]);
+    localStorage.setItem('skuData', JSON.stringify(skuData));
+  }, [skuData]);
 
-  const fetchSKUs = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_URL}/skus`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setSkuData(await res.json());
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
+  // Calculate stats
+  const stats = {
+    total: skuData.length,
+    duplicates: 0,
+    unique: skuData.length
   };
 
-  const fetchStats = async () => {
-    try {
-      const res = await fetch(`${API_URL}/stats`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setStats(await res.json());
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-
-  const handleAuth = async (e) => {
+  const handleAuth = (e) => {
     e.preventDefault();
-    try {
-      const endpoint = isLogin ? '/auth/login' : '/auth/register';
-      const res = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm)
-      });
-
-      const data = await res.json();
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        setToken(data.token);
-        setAuthForm({ email: '', password: '' });
-        alert('✅ ' + data.message);
-      } else {
-        alert('❌ ' + data.error);
-      }
-    } catch (error) {
-      alert('Error: ' + error.message);
+    if (!authForm.email || !authForm.password) {
+      alert('Please enter email and password');
+      return;
     }
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userEmail', authForm.email);
+    setIsLoggedIn(true);
+    setAuthForm({ email: '', password: '' });
   };
 
-  const generateSKU = async () => {
+  const generateSKU = () => {
     if (!formData.stone || !formData.metal || !formData.product) {
       alert('⚠️ Please select Stone, Metal, and Product');
       return;
@@ -98,47 +62,51 @@ const SKUManager = () => {
       sku += `-${formData.customNumber}`;
     }
 
-    try {
-      const res = await fetch(`${API_URL}/skus`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ sku })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        fetchSKUs();
-        fetchStats();
-        setFormData({ stone: '', metal: '', product: '', type: 'product', corporateClient: '', customNumber: '' });
-        alert(`✅ SKU Generated: ${sku}`);
-      } else {
-        alert('⚠️ ' + data.error);
-      }
-    } catch (error) {
-      alert('Error: ' + error.message);
+    // Check for duplicates
+    if (skuData.some(item => item.sku.toUpperCase() === sku.toUpperCase())) {
+      alert('⚠️ This SKU already exists!');
+      return;
     }
+
+    const newSKU = {
+      _id: Date.now().toString(),
+      sku: sku,
+      timestamp: new Date().toLocaleString()
+    };
+
+    setSkuData([...skuData, newSKU]);
+    setFormData({ stone: '', metal: '', product: '', type: 'product', corporateClient: '', customNumber: '' });
+    alert(`✅ SKU Generated: ${sku}`);
   };
 
-  const handleCSVUpload = async (e) => {
+  const handleCSVUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       try {
         const csv = event.target.result;
         const lines = csv.split('\n').map(line => line.trim()).filter(line => line && line !== 'SKU');
         
-        const res = await fetch(`${API_URL}/skus/import`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ skus: lines })
-        });
+        let imported = 0;
+        let duplicates = 0;
 
-        const result = await res.json();
-        alert(`✅ Imported ${result.imported} SKUs\n⚠️ ${result.duplicates} duplicates skipped`);
-        fetchSKUs();
-        fetchStats();
+        const newSKUs = lines.map(sku => {
+          if (skuData.some(item => item.sku.toUpperCase() === sku.toUpperCase())) {
+            duplicates++;
+            return null;
+          }
+          imported++;
+          return {
+            _id: Date.now().toString() + Math.random(),
+            sku: sku.toUpperCase(),
+            timestamp: new Date().toLocaleString()
+          };
+        }).filter(Boolean);
+
+        setSkuData([...skuData, ...newSKUs]);
+        alert(`✅ Imported ${imported} SKUs\n⚠️ ${duplicates} duplicates skipped`);
         e.target.value = '';
       } catch (error) {
         alert('Error: ' + error.message);
@@ -148,7 +116,7 @@ const SKUManager = () => {
   };
 
   const downloadCSV = () => {
-    const csv = skuData.map(item => `${item.sku},${new Date(item.timestamp).toLocaleString()}`).join('\n');
+    const csv = skuData.map(item => `${item.sku},${item.timestamp}`).join('\n');
     const header = 'SKU,Timestamp\n';
     const element = document.createElement('a');
     element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(header + csv));
@@ -156,21 +124,20 @@ const SKUManager = () => {
     element.click();
   };
 
-  const deleteSKU = async (id) => {
-    if (!window.confirm('Delete this SKU?')) return;
-    try {
-      await fetch(`${API_URL}/skus/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      fetchSKUs();
-      fetchStats();
-    } catch (error) {
-      alert('Error: ' + error.message);
+  const deleteSKU = (id) => {
+    if (window.confirm('Delete this SKU?')) {
+      setSkuData(skuData.filter(item => item._id !== id));
     }
   };
 
-  if (!token) {
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userEmail');
+    setIsLoggedIn(false);
+    setAuthForm({ email: '', password: '' });
+  };
+
+  if (!isLoggedIn) {
     return (
       <div className="auth-container">
         <div className="auth-card">
@@ -209,7 +176,7 @@ const SKUManager = () => {
           <h1>📊 SKU Manager</h1>
           <p>Total: <strong>{stats.total}</strong> | Duplicates: <strong>{stats.duplicates}</strong> | Unique: <strong>{stats.unique}</strong></p>
         </div>
-        <button onClick={() => { localStorage.removeItem('token'); setToken(null); }} className="logout-btn">
+        <button onClick={handleLogout} className="logout-btn">
           <LogOut size={20} /> Logout
         </button>
       </header>
@@ -316,7 +283,7 @@ const SKUManager = () => {
                     {skuData.map((item) => (
                       <tr key={item._id}>
                         <td className="sku-cell"><code>{item.sku}</code></td>
-                        <td>{new Date(item.timestamp).toLocaleString()}</td>
+                        <td>{item.timestamp}</td>
                         <td className="action-cell">
                           <button onClick={() => deleteSKU(item._id)} className="btn-delete">
                             <Trash2 size={18} />
